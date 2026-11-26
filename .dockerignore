@@ -1,0 +1,41 @@
+# Build context = only what the image (and the test stage) needs:
+# tracker/, tests/, run.py, demo.py, requirements*.txt
+
+# secrets / local settings
+.env
+.env.*
+
+# app data, backups, mounted repos, exported images
+data
+docker-data
+backups
+repos
+dist
+
+# VCS, deployment and docs (not used inside the image; keeps rebuilds cached)
+.git
+.gitignore
+.dockerignore
+Dockerfile
+compose.yaml
+deploy.sh
+walkthrough
+*.md
+
+# Python / tooling
+.venv
+venv
+**/__pycache__
+**/*.py[cod]
+.pytest_cache
+.coverage
+htmlcov
+.mypy_cache
+.ruff_cache
+
+# editors / OS / Claude
+.vscode
+.idea
+.claude
+**/*.swp
+**/.DS_Store

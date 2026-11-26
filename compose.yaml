@@ -1,0 +1,32 @@
+# Analysis Tracker — one service. Settings come from .env (deploy.sh creates it from .env.example).
+name: analysis-tracker
+
+services:
+  app:
+    image: ${IMAGE:-analysis-tracker}:${TAG:-latest}
+    build:
+      context: .
+      target: runtime
+    restart: unless-stopped
+    # Run as the host user that owns DATA_PATH, so the bind-mounted files stay readable and backup-able.
+    user: "${APP_UID:-10001}:${APP_GID:-10001}"
+    environment:
+      ADMIN_USERNAME: ${ADMIN_USERNAME:-admin}
+      ADMIN_PASSWORD: ${ADMIN_PASSWORD:?set ADMIN_PASSWORD in .env}
+      MAX_UPLOAD_MB: ${MAX_UPLOAD_MB:-500}
+      LOAD_DEMO: ${LOAD_DEMO:-0}
+      APP_PORT: "8000"
+    ports:
+      - "${BIND_ADDR:-127.0.0.1}:${APP_PORT:-8000}:8000"
+    volumes:
+      - ${DATA_PATH:-./docker-data}:/data
+      - ${REPOS_PATH:-./repos}:/repos:ro
+    read_only: true
+    tmpfs:
+      - /tmp
+    # deploy.sh sets this to false on snap-packaged Docker, whose AppArmor profile then refuses to start
+    # any process in the container ("no new privs" denial on exec).
+    security_opt:
+      - no-new-privileges:${NO_NEW_PRIVILEGES:-true}
+    cap_drop: [ALL]
+    stop_grace_period: 20s

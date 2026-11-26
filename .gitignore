@@ -1,0 +1,42 @@
+# --- secrets / local settings ---
+.env
+.env.*
+!.env.example
+
+# --- app data (database, uploaded files, backups) ---
+/data/
+/docker-data/
+/backups/
+*.sqlite3
+*.sqlite3-wal
+*.sqlite3-shm
+
+# git repositories mounted for commit checks (separate repos, not part of this one)
+/repos/
+
+# exported Docker images
+/dist/
+
+# --- Python ---
+.venv/
+venv/
+__pycache__/
+*.py[cod]
+*.egg-info/
+build/
+.pytest_cache/
+.coverage
+htmlcov/
+.mypy_cache/
+.ruff_cache/
+
+# --- editors / OS ---
+.vscode/
+.idea/
+*.swp
+*~
+.DS_Store
+Thumbs.db
+
+# Claude Code per-user settings
+.claude/settings.local.json

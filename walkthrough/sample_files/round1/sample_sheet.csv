@@ -1,0 +1,7 @@
+sample,group,mouse_id,diet_weeks
+ctrl_1,control,M01,12
+ctrl_2,control,M02,12
+ctrl_3,control,M03,12
+hfd_1,high-fat,M04,12
+hfd_2,high-fat,M05,12
+hfd_3,high-fat,M06,12
