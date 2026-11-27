@@ -36,7 +36,9 @@ On the first run the script creates `.env` from `.env.example`, with a random ad
 
 - **One image** (`Dockerfile`, multi-stage). It runs as a non-root user with a read-only root filesystem and includes `git` for commit checks. The `test` stage runs pytest, so a failing test stops the build.
 - **Data** goes to `DATA_PATH` (default `./docker-data`), bind-mounted at `/data`. The container runs as the uid that owns that folder, so the files stay yours on the host. Git repositories go in `REPOS_PATH` (default `./repos`), mounted read-only at `/repos`.
-- **Network:** by default the app listens on `127.0.0.1:8000` only. Set `BIND_ADDR=0.0.0.0` in `.env` to expose it, or put a reverse proxy in front. The proxy must pass the `Host` header through and allow websockets, because the app rejects websockets whose `Origin` doesn't match `Host`.
+- **Network:** by default the app listens on `0.0.0.0:8000`, so other machines on the local network reach it at `http://<this machine's IP>:8000`. `deploy.sh` prints that address. Set `BIND_ADDR=127.0.0.1` in `.env` to allow only this machine.
+  - Docker opens published ports in the firewall itself, past `ufw`, so the app is reachable on **every** network the machine joins. On a laptop that also goes on public Wi-Fi, switch to `127.0.0.1` there, or stop the app with `./deploy.sh down`.
+  - Plain HTTP sends passwords and files unencrypted over the network. That's acceptable on a trusted LAN. Otherwise put a reverse proxy with HTTPS in front; it must pass the `Host` header through and allow websockets, because the app rejects websockets whose `Origin` doesn't match `Host`.
 - **Backup:** `./deploy.sh backup` takes a consistent SQLite snapshot from the running app and writes `backups/tracker-<time>.tar.gz` with the snapshot and all blobs.
 - **No registry?** `./deploy.sh export` writes `dist/analysis-tracker-latest.tar.gz`. Copy it to the server with `deploy.sh`, `compose.yaml` and `.env.example`, then run `./deploy.sh load dist/…tar.gz && ./deploy.sh up`.
 - `LOAD_DEMO=1` in `.env` loads the demo projects on the first start (same as `--demo`).
@@ -61,9 +63,9 @@ Then set `ADMIN_PASSWORD=` (at least 8 characters) and `LOAD_DEMO=1`. The demo o
 ```bash
 ./deploy.sh
 ```
-The first build downloads the Python base image and packages, so it needs internet and takes a few minutes. It ends with `Up: http://127.0.0.1:8000`, plus the admin login if the script created `.env`. If port 8000 is taken, set `APP_PORT` in `.env` and run it again.
+The first build downloads the Python base image and packages, so it needs internet and takes a few minutes. It ends with `Up: http://localhost:8000` and the address for other machines on your network (`On the local network: http://<IP>:8000`), plus the admin login if the script created `.env`. If port 8000 is taken, set `APP_PORT` in `.env` and run it again.
 
-**4. Log in** at http://localhost:8000:
+**4. Log in** at http://localhost:8000, or from another machine at the network address the script printed:
 - `admin` with `ADMIN_PASSWORD` from `.env`
 - `jana` / `analyst123` if you loaded the demo
 

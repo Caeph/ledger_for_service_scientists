@@ -54,7 +54,7 @@ ensure_env() {
   fi
   set -a; . ./.env; set +a
   : "${IMAGE:=analysis-tracker}" "${TAG:=latest}" "${DATA_PATH:=./docker-data}" "${REPOS_PATH:=./repos}"
-  : "${APP_PORT:=8000}" "${BIND_ADDR:=127.0.0.1}"
+  : "${APP_PORT:=8000}" "${BIND_ADDR:=0.0.0.0}"
   [ -n "${ADMIN_PASSWORD:-}" ] || die "ADMIN_PASSWORD is empty in .env."
   [ "${#ADMIN_PASSWORD}" -ge 8 ] || die "ADMIN_PASSWORD in .env must be at least 8 characters."
 
@@ -103,7 +103,14 @@ wait_healthy() {
     info=$("${DOCKER[@]}" inspect --format '{{.State.Health.Status}}|{{.RestartCount}}|{{.State.Status}}|{{.State.Error}}' "$cid" 2>/dev/null || echo "unknown|0|unknown|")
     IFS='|' read -r health restarts state err <<<"$info"
     if [ "$health" = healthy ]; then
-      log "Up: http://${BIND_ADDR/0.0.0.0/localhost}:${APP_PORT}"; return 0
+      log "Up: http://localhost:${APP_PORT}"
+      if [ "$BIND_ADDR" = 0.0.0.0 ]; then
+        local ip
+        for ip in $(hostname -I 2>/dev/null); do
+          case $ip in 172.1[7-9].*|172.2[0-9].*|172.3[01].*|*:*) ;; *) log "On the local network: http://${ip}:${APP_PORT}" ;; esac
+        done
+      fi
+      return 0
     fi
     # A crash loop never reaches "unhealthy", so stop as soon as the container has died or restarted.
     if [ "$health" = unhealthy ] || [ "${restarts:-0}" -gt 0 ] || [ "$state" = exited ] || [ "$state" = dead ]; then

@@ -17,7 +17,7 @@ services:
       LOAD_DEMO: ${LOAD_DEMO:-0}
       APP_PORT: "8000"
     ports:
-      - "${BIND_ADDR:-127.0.0.1}:${APP_PORT:-8000}:8000"
+      - "${BIND_ADDR:-0.0.0.0}:${APP_PORT:-8000}:8000"
     volumes:
       - ${DATA_PATH:-./docker-data}:/data
       - ${REPOS_PATH:-./repos}:/repos:ro
