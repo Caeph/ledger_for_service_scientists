@@ -115,7 +115,7 @@ The walkthrough in `walkthrough/WALKTHROUGH.md` works the same here. The Docker 
 To start over with no data: run `./deploy.sh down`, delete `docker-data`, then run `./deploy.sh`. This deletes all uploaded files and history.
 
 **Troubleshooting**
-- **`exec /usr/bin/tini: operation not permitted`, app never healthy.** Docker is the snap package (`snap list docker`), and its AppArmor profile blocks containers started with `no-new-privileges`. `deploy.sh` detects the snap and writes `NO_NEW_PRIVILEGES=false` to `.env`; if it didn't, set it yourself and run `./deploy.sh up`. Docker's own apt packages (docker-ce) don't have this problem.
+- **`exec /opt/venv/bin/uvicorn: operation not permitted` (or another `exec …: operation not permitted`), app never healthy.** Docker is the snap package (`snap list docker`), and its AppArmor profile blocks containers started with `no-new-privileges`. `deploy.sh` detects the snap and writes `NO_NEW_PRIVILEGES=false` to `.env`; if it didn't, set it yourself and run `./deploy.sh up`. Docker's own apt packages (docker-ce) don't have this problem.
 - **`apparmor="DENIED" … docker_cli … bind` in the kernel log.** Harmless messages from the snap; they don't affect the app.
 - **Permission errors under `docker-data`.** The container runs as the uid in `APP_UID`/`APP_GID` in `.env`, which should own `docker-data`. Fix the folder's owner, or clear both values so the script detects them again.
 - **The app fails to start.** The script stops the container, shows its logs and Docker's error, and exits. `./deploy.sh logs` shows more.

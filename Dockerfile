@@ -28,7 +28,7 @@ RUN /opt/venv/bin/python -m pytest -q -p no:cacheprovider
 FROM ${PYTHON_IMAGE} AS runtime
 # git is only used to verify commit SHAs against repositories mounted at /repos.
 # safe.directory: mounted repos belong to another uid, which git would otherwise refuse to read.
-RUN apt-get update && apt-get install -y --no-install-recommends git tini \
+RUN apt-get update && apt-get install -y --no-install-recommends git \
     && rm -rf /var/lib/apt/lists/* \
     && git config --system --add safe.directory '*' \
     && useradd --system --uid 10001 --user-group --home-dir /app --no-create-home tracker \
@@ -56,5 +56,6 @@ HEALTHCHECK --interval=30s --timeout=5s --start-period=20s --retries=3 \
     CMD python -c "import urllib.request; urllib.request.urlopen('http://127.0.0.1:8000/login', timeout=4)" || exit 1
 
 # Same start command as outside Docker (see main.py), without --reload. Compose maps the host port to 8000.
-ENTRYPOINT ["/usr/bin/tini", "--"]
+# uvicorn runs as PID 1 without an init: it handles SIGTERM itself, and the only child processes
+# (git checks) are waited for, so nothing needs reaping. For an init anyway, set `init: true` in compose.
 CMD ["uvicorn", "main:app", "--host", "0.0.0.0", "--port", "8000"]
