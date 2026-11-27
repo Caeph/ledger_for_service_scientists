@@ -37,7 +37,7 @@ RUN apt-get update && apt-get install -y --no-install-recommends git tini \
 COPY --from=deps /opt/venv /opt/venv
 WORKDIR /app
 COPY tracker ./tracker
-COPY run.py demo.py ./
+COPY run.py main.py demo.py ./
 
 ENV PATH=/opt/venv/bin:$PATH \
     PYTHONUNBUFFERED=1 \

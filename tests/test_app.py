@@ -88,6 +88,21 @@ def test_cross_origin_websocket_rejected(env):
             ws.receive_text()
 
 
+def test_trusted_origin_websocket_allowed():
+    d = tempfile.mkdtemp()
+    t = Tracker(os.path.join(d, "db.sqlite3"), os.path.join(d, "blobs"))
+    t.bootstrap_admin("admin", "admin12345")
+    client = TestClient(create_app(t, trusted_origins=["http://myserver:8000/"]), follow_redirects=False)
+    login(client)
+    with client.websocket_connect("/websocket/", headers={"origin": "http://MyServer:8000"}) as ws:
+        ws.send_text('{"method":"init","data":{}}')
+        assert "config" in ws.receive_text()
+    with pytest.raises(WebSocketDisconnect):
+        with client.websocket_connect("/websocket/", headers={"origin": "http://other:8000"}) as ws:
+            ws.receive_text()
+    shutil.rmtree(d)
+
+
 def test_parse_route():
     assert parse_route("#/") == ("dashboard", None, {})
     assert parse_route("#/sessions/12") == ("session", 12, {})

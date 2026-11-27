@@ -10,6 +10,7 @@ from __future__ import annotations
 import asyncio
 import html
 import re
+import sys
 import urllib.parse
 
 from shiny import App, reactive, render, ui
@@ -188,7 +189,7 @@ padding:8px 16px;font:inherit;font-weight:600;cursor:pointer}}.err{{color:var(--
 <button>Log in</button></form></body></html>"""
 
 
-def create_app(tracker: Tracker, max_mb: int = 500):
+def create_app(tracker: Tracker, max_mb: int = 500, trusted_origins=()):
     shiny_app = App(app_ui, make_server(tracker, max_mb * 1024 * 1024))
 
     def current_user(request: Request):
@@ -264,6 +265,15 @@ def create_app(tracker: Tracker, max_mb: int = 500):
         return Response(data, media_type="application/zip",
                         headers={"Content-Disposition": f'attachment; filename="session_{sid}.zip"'})
 
+    trusted = {o.strip().rstrip("/").lower() for o in trusted_origins if o.strip()}
+
+    def _origin_ok(origin, hdrs):
+        """Same origin as the address the browser used (Host, or X-Forwarded-Host behind a proxy), or listed."""
+        origin = origin.rstrip("/").lower()
+        netloc = urllib.parse.urlparse(origin).netloc
+        hosts = {hdrs.get("host", "").lower()} | {h.strip().lower() for h in hdrs.get("x-forwarded-host", "").split(",")}
+        return netloc in hosts - {""} or origin in trusted or "*" in trusted
+
     async def gated_shiny(scope, receive, send):
         """Page loads need a valid login; the websocket must come from our own origin."""
         if scope["type"] == "http" and scope["path"] in ("", "/"):
@@ -273,8 +283,11 @@ def create_app(tracker: Tracker, max_mb: int = 500):
                 return
         if scope["type"] == "websocket":
             hdrs = {k.decode().lower(): v.decode() for k, v in scope.get("headers", [])}
-            origin, host = hdrs.get("origin", ""), hdrs.get("host", "")
-            if origin and urllib.parse.urlparse(origin).netloc != host:
+            origin = hdrs.get("origin", "")
+            if origin and not _origin_ok(origin, hdrs):
+                print(f"Rejected websocket: browser origin {origin!r} does not match host {hdrs.get('host', '')!r}. "
+                      "If you reach the app through a proxy or a forwarded port, add that address to "
+                      "TRUSTED_ORIGINS (e.g. TRUSTED_ORIGINS=http://myserver:8000).", file=sys.stderr, flush=True)
                 await send({"type": "websocket.close", "code": 1008})
                 return
         await shiny_app(scope, receive, send)

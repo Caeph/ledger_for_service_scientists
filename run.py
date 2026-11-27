@@ -6,7 +6,10 @@
 Settings come from environment variables (same names as the spec's .env):
   DATA_DIR (default ./data), BLOB_DIR (default $DATA_DIR/blobs), REPOS_DIR (optional),
   MAX_UPLOAD_MB (500), APP_PORT (8000), APP_HOST (0.0.0.0), ADMIN_USERNAME, ADMIN_PASSWORD,
-  LOAD_DEMO=1 (same as --demo)
+  LOAD_DEMO=1 (same as --demo), TRUSTED_ORIGINS (comma-separated, e.g. http://myserver:8000)
+
+The same app can be started with the uvicorn CLI instead (see main.py):
+    .venv/bin/uvicorn main:app --host 0.0.0.0 --port 8000 --reload
 """
 import os
 import sys
@@ -30,7 +33,8 @@ def build():
             from demo import load_demo
             load_demo(t, created)
             print("Loaded demo data.")
-    return create_app(t, int(os.environ.get("MAX_UPLOAD_MB", "500")))
+    return create_app(t, int(os.environ.get("MAX_UPLOAD_MB", "500")),
+                      os.environ.get("TRUSTED_ORIGINS", "").split(","))
 
 
 if __name__ == "__main__":

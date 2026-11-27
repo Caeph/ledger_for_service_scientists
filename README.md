@@ -22,9 +22,33 @@ Open http://localhost:8000. The `--demo` flag only does something when `./data` 
 - Admin: `admin` / `admin12345` (change with `ADMIN_USERNAME` / `ADMIN_PASSWORD` before the first run)
 - Demo analyst: `jana` / `analyst123`
 
-Settings are environment variables, with the same names as the spec's `.env`: `DATA_DIR`, `BLOB_DIR`, `REPOS_DIR`, `MAX_UPLOAD_MB` (500), `APP_PORT` (8000), `APP_HOST`, `ADMIN_USERNAME`, `ADMIN_PASSWORD`.
+Settings are environment variables, with the same names as the spec's `.env`: `DATA_DIR`, `BLOB_DIR`, `REPOS_DIR`, `MAX_UPLOAD_MB` (500), `APP_PORT` (8000), `APP_HOST`, `ADMIN_USERNAME`, `ADMIN_PASSWORD`, `LOAD_DEMO`, `TRUSTED_ORIGINS`.
 
 A guided tour with sample files is in `walkthrough/WALKTHROUGH.md`.
+
+### On a server in your local network (without Docker)
+
+On the server, after creating the venv as above, start it like any uvicorn app:
+
+```bash
+.venv/bin/uvicorn main:app --host 0.0.0.0 --port 8000 --reload
+```
+
+Then open `http://<server's IP>:8000` in the browser on your own computer. `--reload` restarts the app when a `.py` file changes. Add `LOAD_DEMO=1` in front of the command for demo data on the first start. The data goes to `./data` on the server, or `DATA_DIR`.
+
+**If the login works but the page then stays empty or greys out**, the browser's live connection (websocket) was refused. The server log says why:
+
+```
+Rejected websocket: browser origin 'http://…' does not match host '…'
+```
+
+The app only accepts that connection from the address the server itself sees, to stop other web pages from using your login. When you go through a reverse proxy, or a port forward that changes the address, allow your browser's address explicitly:
+
+```bash
+TRUSTED_ORIGINS=http://localhost:9000 .venv/bin/uvicorn main:app --host 0.0.0.0 --port 8000 --reload
+```
+
+Use exactly what your browser's address bar shows (scheme, host, port); separate several with commas. A plain SSH tunnel (`ssh -L 8000:localhost:8000 server`, then `http://localhost:8000`) works without this.
 
 ## Run it in Docker
 
@@ -97,7 +121,7 @@ To start over with no data: run `./deploy.sh down`, delete `docker-data`, then r
 ```
 
 - `tests/test_services.py` (26 tests): invariants 1–7 and most acceptance criteria. Covers versioning, blob dedup, no-delete, finalize rules, read-only after finalize, script-only methods, lineage, iteration versioning, zip manifest hashes, search, audit log, argon2 with legacy-hash upgrade, and dashboard speed with 50 projects and 1,000 sessions.
-- `tests/test_app.py` (8 tests): the HTTP layer. Covers the login gate on every page and file route, the HttpOnly cookie, logout, attachment downloads, sandboxed HTML previews, and rejection of cross-origin websockets.
+- `tests/test_app.py` (9 tests): the HTTP layer. Covers the login gate on every page and file route, the HttpOnly cookie, logout, attachment downloads, sandboxed HTML previews, and rejection of cross-origin websockets.
 
 The Shiny pages themselves were checked by clicking through the full walkthrough in a browser. There are no automated UI tests yet (that would need Playwright).
 
@@ -109,7 +133,8 @@ tracker/storage.py     content-addressed blob store
 tracker/db.py          schema (SQLite in the prototype)
 tracker/app.py         ASGI app: Shiny server + Starlette routes for /login, /logout, /files/…
 tracker/ui/            one module per page: dashboard, project, session, artifact, search, admin
-run.py                 starts uvicorn
+run.py                 starts uvicorn (python run.py)
+main.py                ASGI entry for the uvicorn CLI (uvicorn main:app)
 demo.py                demo data
 ```
 
