@@ -6,11 +6,14 @@ services:
     image: ${IMAGE:-analysis-tracker}:${TAG:-latest}
     build:
       context: .
-      target: runtime
     restart: unless-stopped
     # Run as the host user that owns DATA_PATH, so the bind-mounted files stay readable and backup-able.
     user: "${APP_UID:-10001}:${APP_GID:-10001}"
     environment:
+      # Keep the database and files in the mounted /data (the image's default is /app/data, which is read-only here).
+      DATA_DIR: /data
+      REPOS_DIR: /repos
+      HOME: /tmp
       ADMIN_USERNAME: ${ADMIN_USERNAME:-admin}
       ADMIN_PASSWORD: ${ADMIN_PASSWORD:?set ADMIN_PASSWORD in .env}
       MAX_UPLOAD_MB: ${MAX_UPLOAD_MB:-500}
@@ -21,6 +24,12 @@ services:
     volumes:
       - ${DATA_PATH:-./docker-data}:/data
       - ${REPOS_PATH:-./repos}:/repos:ro
+    healthcheck:
+      test: ["CMD", "python", "-c", "import urllib.request; urllib.request.urlopen('http://127.0.0.1:8000/login', timeout=4)"]
+      interval: 30s
+      timeout: 5s
+      start_period: 20s
+      retries: 3
     read_only: true
     tmpfs:
       - /tmp

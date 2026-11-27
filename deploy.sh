@@ -1,10 +1,10 @@
 #!/usr/bin/env bash
 # Build, test and deploy the Analysis Tracker with Docker Compose.
 #
-#   ./deploy.sh                 test + build + (re)start, then wait until healthy   (same as: deploy)
+#   ./deploy.sh                 build + test + (re)start, then wait until healthy   (same as: deploy)
 #   ./deploy.sh deploy --skip-tests
 #   ./deploy.sh build           build the runtime image (tagged $IMAGE:$TAG and $IMAGE:<timestamp>)
-#   ./deploy.sh test            run the test suite inside a throwaway build stage
+#   ./deploy.sh test            run the test suite inside the built image (throwaway container)
 #   ./deploy.sh up | down | restart | status | logs
 #   ./deploy.sh backup          consistent DB snapshot + blobs -> ./backups/tracker-<time>.tar.gz
 #   ./deploy.sh export          save the image to ./dist/<image>-<tag>.tar.gz (for a server without a registry)
@@ -86,15 +86,17 @@ ensure_env() {
 
 # --- commands -------------------------------------------------------------------------------------
 cmd_test() {
-  log "Running the test suite in a build stage…"
-  "${DOCKER[@]}" build --target test -t "${IMAGE}:test" .
+  # Runs the test suite inside the built image (installs the test tools into a throwaway container).
+  log "Running the test suite in ${IMAGE}:${TAG}…"
+  "${DOCKER[@]}" run --rm --user 0 --read-only=false --entrypoint sh "${IMAGE}:${TAG}" -c \
+    "pip install -q --no-cache-dir -r requirements-dev.txt && python -m pytest -q -p no:cacheprovider"
   log "Tests passed."
 }
 
 cmd_build() {
   local stamp; stamp=$(date +%Y%m%d-%H%M%S)
   log "Building ${IMAGE}:${TAG} (also tagged ${IMAGE}:${stamp})…"
-  "${DOCKER[@]}" build --target runtime -t "${IMAGE}:${TAG}" -t "${IMAGE}:${stamp}" .
+  "${DOCKER[@]}" build -t "${IMAGE}:${TAG}" -t "${IMAGE}:${stamp}" .
 }
 
 wait_healthy() {
@@ -144,8 +146,8 @@ cmd_up() {
 cmd_deploy() {
   local skip=0
   for a in "$@"; do [ "$a" = --skip-tests ] && skip=1; done
-  [ $skip = 1 ] || cmd_test
   cmd_build
+  [ $skip = 1 ] || cmd_test
   cmd_up
 }
 

@@ -59,12 +59,13 @@ Use exactly what your browser's address bar shows (scheme, host, port); separate
 ## Run it in Docker
 
 ```bash
-./deploy.sh            # runs the tests in a build stage, builds the image, starts it, waits until healthy
+./deploy.sh            # builds the image, runs the tests in it, starts it, waits until healthy
 ```
 
 On the first run the script creates `.env` from `.env.example`, with a random admin password, and prints the login. Other commands: `build`, `test`, `up`, `down`, `restart`, `status`, `logs`, `backup`, `export`, `load FILE` (`./deploy.sh help`). Inside the container the app starts the same way as with `serve`, as `uvicorn main:app --host 0.0.0.0 --port 8000`, just without `--reload`. If your user isn't in the `docker` group, the script falls back to `sudo docker`.
 
-- **One image** (`Dockerfile`, multi-stage). It runs as a non-root user with a read-only root filesystem and includes `git` for commit checks. The `test` stage runs pytest, so a failing test stops the build.
+- **One image** (`Dockerfile`): `python:3.12-slim` with the requirements, starting `uvicorn main:app --host 0.0.0.0 --port 8000 --reload`. `compose.yaml` runs it as your uid with a read-only root filesystem, and adds the health check and the data settings (`DATA_DIR=/data`). `./deploy.sh test` runs pytest inside the built image, so a failing test stops the deploy.
+  - The image includes `git`, so commit SHAs are checked against the repositories in `REPOS_PATH` (mounted at `/repos`). `safe.directory '*'` lets git read repositories owned by another user.
 - **Data** goes to `DATA_PATH` (default `./docker-data`), bind-mounted at `/data`. The container runs as the uid that owns that folder, so the files stay yours on the host. Git repositories go in `REPOS_PATH` (default `./repos`), mounted read-only at `/repos`.
 - **Network:** by default the app listens on `0.0.0.0:8000`, so other machines on the local network reach it at `http://<this machine's IP>:8000`. `deploy.sh` prints that address. Set `BIND_ADDR=127.0.0.1` in `.env` to allow only this machine.
   - Docker opens published ports in the firewall itself, past `ufw`, so the app is reachable on **every** network the machine joins. On a laptop that also goes on public Wi-Fi, switch to `127.0.0.1` there, or stop the app with `./deploy.sh down`.
@@ -156,7 +157,7 @@ demo.py                demo data
 | --- | --- |
 | MySQL 8 + SQLAlchemy/Alembic | SQLite with the same tables plus `auth_sessions`, so Docker runs one app container and no database container |
 | Docker Compose, `make dump` | `compose.yaml` + `deploy.sh` (`./deploy.sh backup` replaces `make dump`) |
-| Git validation against `/repos` | Implemented, but **untested**: git isn't installed on the build machine. Without a mounted repo the method shows "not verified", as the spec describes. |
+| Git validation against `/repos` | Implemented and checked by hand against a real repository (a known commit is verified with its message, an unknown SHA is rejected); no automated test yet. Without a mounted repo the method shows "not verified", as the spec describes. |
 
 **Changed from the spec on request:**
 - **A method can be just the script.** A method record needs a git commit SHA, an uploaded script or notebook, or both. With a script only, the session shows a "script only" badge, and lineage shows the script and its version instead of a commit. Uploading a script with the same name again makes a new version of it. Finalize still requires exactly one method record.
