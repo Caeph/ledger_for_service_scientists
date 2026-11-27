@@ -9,6 +9,9 @@
 #   ./deploy.sh backup          consistent DB snapshot + blobs -> ./backups/tracker-<time>.tar.gz
 #   ./deploy.sh export          save the image to ./dist/<image>-<tag>.tar.gz (for a server without a registry)
 #   ./deploy.sh load FILE       load an exported image on the target server
+#   ./deploy.sh serve [--no-reload]
+#                               no Docker: run `uvicorn main:app --host 0.0.0.0 --port $APP_PORT --reload`
+#                               from .venv (created if missing), data in ./data (or DATA_DIR)
 #
 # Settings live in .env (created from .env.example on first run, with a random admin password).
 set -euo pipefail
@@ -182,12 +185,53 @@ cmd_load() {
   gunzip -c "$1" | "${DOCKER[@]}" load
 }
 
-usage() { sed -n '2,13p' "$0" | sed 's/^# \{0,1\}//'; }
+# --- serve: plain uvicorn from the project venv, no Docker -------------------------------------------
+cmd_serve() {
+  local reload=(--reload) a
+  for a in "$@"; do
+    case $a in --no-reload) reload=() ;; *) die "Unknown option for serve: $a" ;; esac
+  done
+  # Reuse the settings from .env if there is one (port, admin, demo, trusted origins).
+  # DATA_PATH there is the Docker data folder, so serve keeps its own: DATA_DIR, default ./data.
+  # Variables already set in the shell win over .env.
+  if [ -f .env ]; then
+    local key val
+    while IFS='=' read -r key val; do
+      [[ $key =~ ^[A-Z_][A-Z0-9_]*$ ]] || continue
+      [ -n "${!key:-}" ] || export "$key=$val"
+    done < .env
+  fi
+  export DATA_DIR="${DATA_DIR:-./data}"
+  local port="${APP_PORT:-8000}"
+  [ -n "${ADMIN_PASSWORD:-}" ] || warn "No ADMIN_PASSWORD set: a new database gets admin / admin12345."
+
+  if [ ! -x .venv/bin/uvicorn ]; then
+    log "Creating .venv and installing requirements…"
+    if ! python3 -m venv .venv 2>/dev/null; then
+      # Python without ensurepip: make the venv without pip and install into it with the system pip.
+      rm -rf .venv
+      python3 -m venv --without-pip .venv
+      python3 -m pip --python .venv/bin/python install -r requirements.txt
+    else
+      .venv/bin/python -m pip install -r requirements.txt
+    fi
+  fi
+
+  log "Serving on http://localhost:${port} (data: ${DATA_DIR}${reload:+, auto-reload on .py changes})"
+  local ip
+  for ip in $(hostname -I 2>/dev/null); do
+    case $ip in 172.1[7-9].*|172.2[0-9].*|172.3[01].*|*:*) ;; *) log "On the local network: http://${ip}:${port}" ;; esac
+  done
+  exec .venv/bin/uvicorn main:app --host 0.0.0.0 --port "$port" "${reload[@]}"
+}
+
+usage() { sed -n '2,16p' "$0" | sed 's/^# \{0,1\}//'; }
 
 main() {
   local cmd=${1:-deploy}; shift || true
   case $cmd in
     -h|--help|help) usage; exit 0 ;;
+    serve) cmd_serve "$@"; exit ;;
   esac
   init_docker
   ensure_env

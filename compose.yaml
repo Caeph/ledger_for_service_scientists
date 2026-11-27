@@ -16,7 +16,6 @@ services:
       MAX_UPLOAD_MB: ${MAX_UPLOAD_MB:-500}
       LOAD_DEMO: ${LOAD_DEMO:-0}
       TRUSTED_ORIGINS: ${TRUSTED_ORIGINS:-}
-      APP_PORT: "8000"
     ports:
       - "${BIND_ADDR:-0.0.0.0}:${APP_PORT:-8000}:8000"
     volumes:

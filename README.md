@@ -28,13 +28,19 @@ A guided tour with sample files is in `walkthrough/WALKTHROUGH.md`.
 
 ### On a server in your local network (without Docker)
 
-On the server, after creating the venv as above, start it like any uvicorn app:
+On the server, start it like any uvicorn app:
 
 ```bash
-.venv/bin/uvicorn main:app --host 0.0.0.0 --port 8000 --reload
+./deploy.sh serve
 ```
 
-Then open `http://<server's IP>:8000` in the browser on your own computer. `--reload` restarts the app when a `.py` file changes. Add `LOAD_DEMO=1` in front of the command for demo data on the first start. The data goes to `./data` on the server, or `DATA_DIR`.
+This creates `.venv` if it's missing, then runs `uvicorn main:app --host 0.0.0.0 --port 8000 --reload` and prints the server's network address. Open `http://<server's IP>:8000` in the browser on your own computer. `--reload` restarts the app when a `.py` file changes; `./deploy.sh serve --no-reload` turns that off. Stop it with Ctrl+C.
+
+- Settings come from `.env` if there is one (`APP_PORT`, `ADMIN_PASSWORD`, `LOAD_DEMO`, `TRUSTED_ORIGINS`, …). Variables set on the command line win, e.g. `APP_PORT=9000 ./deploy.sh serve`.
+- The data goes to `./data`, or `DATA_DIR`. That's separate from the Docker instance's `./docker-data`.
+- If the Docker instance is running, it already uses port 8000; give `serve` another port.
+
+You can also run uvicorn directly: `.venv/bin/uvicorn main:app --host 0.0.0.0 --port 8000 --reload`.
 
 **If the login works but the page then stays empty or greys out**, the browser's live connection (websocket) was refused. The server log says why:
 
@@ -45,7 +51,7 @@ Rejected websocket: browser origin 'http://…' does not match host '…'
 The app only accepts that connection from the address the server itself sees, to stop other web pages from using your login. When you go through a reverse proxy, or a port forward that changes the address, allow your browser's address explicitly:
 
 ```bash
-TRUSTED_ORIGINS=http://localhost:9000 .venv/bin/uvicorn main:app --host 0.0.0.0 --port 8000 --reload
+TRUSTED_ORIGINS=http://localhost:9000 ./deploy.sh serve
 ```
 
 Use exactly what your browser's address bar shows (scheme, host, port); separate several with commas. A plain SSH tunnel (`ssh -L 8000:localhost:8000 server`, then `http://localhost:8000`) works without this.
@@ -56,7 +62,7 @@ Use exactly what your browser's address bar shows (scheme, host, port); separate
 ./deploy.sh            # runs the tests in a build stage, builds the image, starts it, waits until healthy
 ```
 
-On the first run the script creates `.env` from `.env.example`, with a random admin password, and prints the login. Other commands: `build`, `test`, `up`, `down`, `restart`, `status`, `logs`, `backup`, `export`, `load FILE` (`./deploy.sh help`). If your user isn't in the `docker` group, the script falls back to `sudo docker`.
+On the first run the script creates `.env` from `.env.example`, with a random admin password, and prints the login. Other commands: `build`, `test`, `up`, `down`, `restart`, `status`, `logs`, `backup`, `export`, `load FILE` (`./deploy.sh help`). Inside the container the app starts the same way as with `serve`, as `uvicorn main:app --host 0.0.0.0 --port 8000`, just without `--reload`. If your user isn't in the `docker` group, the script falls back to `sudo docker`.
 
 - **One image** (`Dockerfile`, multi-stage). It runs as a non-root user with a read-only root filesystem and includes `git` for commit checks. The `test` stage runs pytest, so a failing test stops the build.
 - **Data** goes to `DATA_PATH` (default `./docker-data`), bind-mounted at `/data`. The container runs as the uid that owns that folder, so the files stay yours on the host. Git repositories go in `REPOS_PATH` (default `./repos`), mounted read-only at `/repos`.
